@@ -25,7 +25,7 @@ commit_dependecies.png - составленный граф
 
 commit-tree-example.zip - клонированный репозиторий
 
-## Код программы 
+## Код программы script.py
 ```
 import json
 import os
@@ -111,6 +111,81 @@ def main():
     
 if __name__ == "__main__":
     main()
+```
+
+## Код файла config.json
+```
+{
+    "graph_tool_path": "/usr/local/bin/dot",
+    "package_name": "Microsoft.AspNetCore.Mvc, Version=2.2.0",
+    "output_path": "/Users/mglkv/DependencyVisualizer/output_graph.dot",
+    "repository_url": "https://api.nuget.org/v3/registration5-gz-semver2"
+}
+
+```
+
+
+## Запуск тестов test_script.py
+```
+import unittest
+from unittest.mock import patch, mock_open, MagicMock
+import script
+
+class TestDependencyVisualizer(unittest.TestCase):
+    @patch("script.open", new_callable=mock_open, read_data='{"key": "value"}')
+    def test_load_config(self, mock_file):
+        config = script.load_config("mock_config.json")
+        self.assertEqual(config, {"key": "value"})
+
+    @patch("requests.get")
+    def test_fetch_dependencies(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "items": [
+                {
+                    "items": [
+                        {"catalogEntry": {"version": "1.0.0"}},
+                        {"catalogEntry": {"version": "2.0.0"}}
+                    ]
+                }
+            ]
+        }
+        mock_get.return_value = mock_response
+        dependencies = script.fetch_dependencies("Test.Package", "https://example.com")
+        self.assertIsInstance(dependencies, list)
+
+    @patch("script.Digraph")
+    def test_create_graph(self, mock_digraph):
+        mock_graph = mock_digraph.return_value
+        dependencies = [{"targetFramework": "net5.0", "dependencies": [{"id": "Test.Dependency"}]}]
+        script.create_graph(dependencies, "Test.Package", "output.dot")
+        mock_graph.node.assert_any_call("net5.0", shape="box")
+        mock_graph.node.assert_any_call("Test.Dependency")
+        mock_graph.edge.assert_called_with("net5.0", "Test.Dependency")
+        mock_graph.save.assert_called_with("output.dot")
+
+    @patch("script.fetch_dependencies")
+    @patch("script.create_graph")
+    @patch("script.load_config")
+    @patch("os.system")
+    def test_full_process(self, mock_system, mock_load_config, mock_create_graph, mock_fetch_dependencies):
+        mock_load_config.return_value = {
+            "package_name": "Test.Package",
+            "repository_url": "https://example.com",
+            "output_path": "output.dot",
+            "graph_tool_path": "/usr/local/bin/dot"
+        }
+        mock_fetch_dependencies.return_value = [{"targetFramework": "net5.0", "dependencies": [{"id": "Test.Dependency"}]}]
+        script.main()
+        mock_fetch_dependencies.assert_called_once_with("Test.Package", "https://example.com")
+        mock_create_graph.assert_called_once()
+        mock_system.assert_any_call("/usr/local/bin/dot -Tpng output.dot -o output.png")
+        mock_system.assert_any_call("open output.png")
+
+if __name__ == "__main__":
+    unittest.main()
+
 ```
 
 ## Запуск программы
