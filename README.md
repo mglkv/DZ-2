@@ -26,6 +26,7 @@ commit_dependecies.png - составленный граф
 commit-tree-example.zip - клонированный репозиторий
 
 ## Код программы 
+```
 import json
 import os
 from graphviz import Digraph
@@ -110,7 +111,7 @@ def main():
     
 if __name__ == "__main__":
     main()
-
+```
 
 ## Запуск программы
 
